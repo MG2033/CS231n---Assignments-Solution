@@ -77,17 +77,15 @@ def softmax_loss_vectorized(W, X, y, reg):
   loss /= num_train
   loss += 0.5 * reg * np.sum(W * W)
 
-  #Gradient Calculation
-  dW = np.dot(X.T,(np.exp(scores) / np.matrix(summ).T))
-  bin = np.zeros_like(scores)
-  bin[range(num_train),y] = 1
-  dW -= np.dot(X.T,bin)
+  #Gradient Calculation using chain rule
+  gradF = np.array(np.exp(scores) / np.matrix(summ).T)
+  gradF[range(num_train),y]-=1
+  dW = np.dot(X.T,gradF)
 
   dW /= num_train
   dW += reg * W
   #############################################################################
   #                          END OF YOUR CODE                                 #
   #############################################################################
-
   return loss, dW
 
