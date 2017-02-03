@@ -177,6 +177,9 @@ class FullyConnectedNet(object):
     for i in range(self.num_layers):
         self.params['W'+str(i+1)] = weight_scale * np.random.randn(dims[i],dims[i+1])
         self.params['b'+str(i+1)] = np.zeros(dims[i+1])
+        if i < self.num_layers - 1 and use_batchnorm:
+            self.params['gamma'+str(i+1)] = np.ones(dims[i+1])
+            self.params['beta'+str(i+1)] = np.zeros(dims[i+1])
 
     ############################################################################
     #                             END OF YOUR CODE                             #
@@ -243,13 +246,14 @@ class FullyConnectedNet(object):
             caches.append(cache)
         else:
             if self.use_batchnorm:
-                pass
+                input_to_layer,cache = affine_batchnorm_relu_forward(input_to_layer,self.params['W' + str(i + 1)],self.params['b' + str(i + 1)],self.params['gamma' + str(i + 1)],self.params['beta' + str(i + 1)],self.bn_params[i])
             else:
                 input_to_layer, cache = affine_relu_forward(input_to_layer, self.params['W' + str(i + 1)],self.params['b' + str(i + 1)])
-                caches.append(cache)
+            caches.append(cache)
 
             if self.use_dropout:
                 pass
+                caches.append(cache)
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
@@ -282,7 +286,7 @@ class FullyConnectedNet(object):
             dx, grads['W' + str(i + 1)], grads['b' + str(i + 1)] = affine_backward(dx,caches[i])
         else:
             if self.use_batchnorm:
-                pass
+                dx, grads['W' + str(i + 1)], grads['b' + str(i + 1)],grads['gamma'+ str(i + 1)],grads['beta'+ str(i + 1)] = affine_batchnorm_relu_backward(dx,caches[i])
             else:
                 dx, grads['W' + str(i + 1)], grads['b' + str(i + 1)] = affine_relu_backward(dx, caches[i])
 
@@ -294,3 +298,16 @@ class FullyConnectedNet(object):
     ############################################################################
 
     return loss, grads
+
+def affine_batchnorm_relu_forward(x,w,b,gamma,beta,bnparam):
+    out,cache1 = affine_forward(x,w,b)
+    out,cache2 = batchnorm_forward(out,gamma,beta,bnparam)
+    out,cache3 = relu_forward(out)
+    return out,(cache1,cache2,cache3)
+
+def affine_batchnorm_relu_backward(dout,cache):
+    cache1,cache2,cache3 = cache
+    dx3 = relu_backward(dout,cache3)
+    dx2,dgamma,dbeta = batchnorm_backward_alt(dx3,cache2)
+    dx,dw,db = affine_backward(dx2,cache1)
+    return dx,dw,db,dgamma,dbeta
