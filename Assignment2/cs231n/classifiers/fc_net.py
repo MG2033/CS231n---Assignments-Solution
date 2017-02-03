@@ -239,6 +239,7 @@ class FullyConnectedNet(object):
     # layer, etc.                                                              #
     ############################################################################
     caches = []
+    cachesD = []
     input_to_layer = X
     for i in range(self.num_layers):
         if i == self.num_layers - 1:
@@ -252,8 +253,8 @@ class FullyConnectedNet(object):
             caches.append(cache)
 
             if self.use_dropout:
-                pass
-                caches.append(cache)
+                input_to_layer, cacheD = dropout_forward(input_to_layer, self.dropout_param)
+                cachesD.append(cacheD)
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
@@ -285,13 +286,15 @@ class FullyConnectedNet(object):
         if i == self.num_layers - 1:
             dx, grads['W' + str(i + 1)], grads['b' + str(i + 1)] = affine_backward(dx,caches[i])
         else:
+
+            if self.use_dropout:
+                dx = dropout_backward(dx,cachesD[i])
+
             if self.use_batchnorm:
                 dx, grads['W' + str(i + 1)], grads['b' + str(i + 1)],grads['gamma'+ str(i + 1)],grads['beta'+ str(i + 1)] = affine_batchnorm_relu_backward(dx,caches[i])
             else:
                 dx, grads['W' + str(i + 1)], grads['b' + str(i + 1)] = affine_relu_backward(dx, caches[i])
 
-            if self.use_dropout:
-                pass
         grads['W' + str(i + 1)] += self.reg * self.params['W' + str(i + 1)]
     ############################################################################
     #                             END OF YOUR CODE                             #
