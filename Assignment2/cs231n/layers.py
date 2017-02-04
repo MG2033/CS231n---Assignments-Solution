@@ -1,5 +1,5 @@
 import numpy as np
-
+from scipy.ndimage.filters import convolve
 
 def affine_forward(x, w, b):
   """
@@ -396,7 +396,24 @@ def conv_forward_naive(x, w, b, conv_param):
   # TODO: Implement the convolutional forward pass.                           #
   # Hint: you can use the function np.pad for padding.                        #
   #############################################################################
-  pass
+  N = x.shape[0]
+  H = x.shape[2]
+  W = x.shape[3]
+  F = w.shape[0]
+  P = conv_param['pad']
+  S = conv_param['stride']
+  HH = w.shape[2]
+  WW = w.shape[3]
+  Hd = 1 + (H + 2 * P - w.shape[2]) / S
+  Wd = 1 + (W + 2 * P - w.shape[3]) / S
+  out = np.zeros((N,F,Hd,Wd))
+  xpadded = np.pad(x,((0,),(0,),(P,),(P,)),'constant')
+
+  for i in xrange(N):
+    for j in xrange(F):
+     for k in xrange(Hd):
+       for l in xrange(Wd):
+          out[i,j,k,l] = np.sum(xpadded[i,:,k*S:k*S + HH,l*S:l*S + WW] * w[j]) + b[j]
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
@@ -421,7 +438,34 @@ def conv_backward_naive(dout, cache):
   #############################################################################
   # TODO: Implement the convolutional backward pass.                          #
   #############################################################################
-  pass
+  x,w,b,conv_param = cache
+  N = x.shape[0]
+  H = x.shape[2]
+  W = x.shape[3]
+  F = w.shape[0]
+  P = conv_param['pad']
+  S = conv_param['stride']
+  HH = w.shape[2]
+  WW = w.shape[3]
+  Hd = 1 + (H + 2 * P - w.shape[2]) / S
+  Wd = 1 + (W + 2 * P - w.shape[3]) / S
+  xpadded = np.pad(x, ((0,), (0,), (P,), (P,)), 'constant')
+
+  dw = np.zeros(w.shape)
+  dx = np.zeros(xpadded.shape)
+
+  for i in xrange(N):
+    for j in xrange(F):
+     for k in xrange(Hd):
+       for l in xrange(Wd):
+          dw[j] += xpadded[i, :, k * S:k * S + HH, l * S:l * S + WW] * dout[i, j, k, l]
+          dx[i, :, k * S:k * S + HH, l * S:l * S + WW] += w[j] * dout[i, j, k, l]
+  db = np.sum(np.sum(np.sum(dout,axis=3),axis=2).T,axis=1)
+
+  #Remove Padding from dx.
+  dx = dx[:,:,P:dx.shape[2]-P,P:dx.shape[3]-P]
+
+
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
@@ -447,7 +491,19 @@ def max_pool_forward_naive(x, pool_param):
   #############################################################################
   # TODO: Implement the max pooling forward pass                              #
   #############################################################################
-  pass
+  N,C,H,W = x.shape
+  ph = pool_param['pool_height']
+  pw = pool_param['pool_width']
+  S = pool_param['stride']
+  Hd = (H-ph)/S + 1
+  Wd = (W-pw)/S + 1
+  out = np.zeros((N,C,Hd, Wd))
+
+  for i in xrange(N):
+    for j in xrange(C):
+        for k in xrange(Hd):
+            for l in xrange(Wd):
+                out[i,j,k,l] = np.max(x[i,j, k*S : k*S + ph, l*S : l*S + pw])
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
@@ -470,7 +526,22 @@ def max_pool_backward_naive(dout, cache):
   #############################################################################
   # TODO: Implement the max pooling backward pass                             #
   #############################################################################
-  pass
+  x, pool_param = cache
+  N, C, H, W = x.shape
+  ph = pool_param['pool_height']
+  pw = pool_param['pool_width']
+  S = pool_param['stride']
+  Hd = (H - ph) / S + 1
+  Wd = (W - pw) / S + 1
+
+  dx = np.zeros((N,C,H,W))
+  for i in xrange(N):
+    for j in xrange(C):
+        for k in xrange(Hd):
+            for l in xrange(Wd):
+                window = x[i,j, k*S : k*S + ph, l*S : l*S + pw]
+                dx[i,j, k*S : k*S + ph, l*S : l*S + pw] = (window == np.max(window)) * dout[i,j,k,l]
+
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
