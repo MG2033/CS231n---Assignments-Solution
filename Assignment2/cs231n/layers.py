@@ -579,11 +579,12 @@ def spatial_batchnorm_forward(x, gamma, beta, bn_param):
   # version of batch normalization defined above. Your implementation should  #
   # be very short; ours is less than five lines.                              #
   #############################################################################
-  pass
+  N,C,H,W = x.shape
+  out,cache = batchnorm_forward(np.reshape(np.swapaxes(x, 0, 1),(C, -1)).T, gamma, beta, bn_param)
+  out = np.swapaxes(np.reshape(out.T, (C, N, H, W)), 0, 1)
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
-
   return out, cache
 
 
@@ -609,11 +610,12 @@ def spatial_batchnorm_backward(dout, cache):
   # version of batch normalization defined above. Your implementation should  #
   # be very short; ours is less than five lines.                              #
   #############################################################################
-  pass
+  N, C, H, W = dout.shape
+  dx, dgamma, dbeta = batchnorm_backward_alt(np.reshape(np.swapaxes(dout, 0, 1),(C, -1)).T,cache)
+  dx = np.swapaxes(np.reshape(dx.T,(C,N,H,W)),0,1)
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
-
   return dx, dgamma, dbeta
   
 
@@ -658,6 +660,7 @@ def softmax_loss(x, y):
   - loss: Scalar giving the loss
   - dx: Gradient of the loss with respect to x
   """
+
   probs = np.exp(x - np.max(x, axis=1, keepdims=True))
   probs /= np.sum(probs, axis=1, keepdims=True)
   N = x.shape[0]
