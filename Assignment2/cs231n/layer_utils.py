@@ -91,3 +91,47 @@ def conv_relu_pool_backward(dout, cache):
   dx, dw, db = conv_backward_fast(da, conv_cache)
   return dx, dw, db
 
+# Extra sandwich layers
+
+def conv_bnorm_relu_forward(x, w, b, conv_param, gamma, beta, bn_param):
+  a, conv_cache = conv_forward_fast(x, w, b, conv_param)
+  a, bn_cache = spatial_batchnorm_forward(a, gamma, beta, bn_param)
+  out, relu_cache = relu_forward(a)
+  cache = (conv_cache,bn_cache,relu_cache)
+  return out,cache
+
+def conv_bnorm_relu_backward(dout,cache):
+  conv_cache, bn_cache, relu_cache = cache
+  da = relu_backward(dout, relu_cache)
+  da, dgamma, dbeta = spatial_batchnorm_backward(da, bn_cache)
+  dx, dw, db = conv_backward_fast(da, conv_cache)
+  return dx, dw, db, dgamma, dbeta
+
+def conv_bnorm_relu_pool_forward(x, w, b, conv_param, pool_param, gamma, beta, bn_param):
+  a, conv_cache = conv_forward_fast(x, w, b, conv_param)
+  a, bn_cache = spatial_batchnorm_forward(a, gamma, beta, bn_param)
+  a, relu_cache = relu_forward(a)
+  out, pool_cache = max_pool_forward_fast(a, pool_param)
+  cache = (conv_cache,bn_cache,relu_cache,pool_cache)
+  return out,cache
+
+def conv_bnorm_relu_pool_backward(dout,cache):
+  conv_cache, bn_cache, relu_cache, pool_cache = cache
+  da = max_pool_backward_fast(dout, pool_cache)
+  da = relu_backward(da, relu_cache)
+  da, dgamma, dbeta = spatial_batchnorm_backward(da, bn_cache)
+  dx, dw, db = conv_backward_fast(da, conv_cache)
+  return dx, dw, db, dgamma, dbeta
+
+def affine_batchnorm_relu_forward(x,w,b,gamma,beta,bnparam):
+    out,cache1 = affine_forward(x,w,b)
+    out,cache2 = batchnorm_forward(out,gamma,beta,bnparam)
+    out,cache3 = relu_forward(out)
+    return out,(cache1,cache2,cache3)
+
+def affine_batchnorm_relu_backward(dout,cache):
+    cache1,cache2,cache3 = cache
+    dx3 = relu_backward(dout,cache3)
+    dx2,dgamma,dbeta = batchnorm_backward_alt(dx3,cache2)
+    dx,dw,db = affine_backward(dx2,cache1)
+    return dx,dw,db,dgamma,dbeta
