@@ -135,7 +135,36 @@ class CaptioningRNN(object):
     # defined above to store loss and gradients; grads[k] should give the      #
     # gradients for self.params[k].                                            #
     ############################################################################
-    pass
+
+    # Forward Pass
+    h0 = np.dot(features,W_proj) + b_proj
+    x, embed_cache = word_embedding_forward(captions_in, W_embed)
+
+    h, rnn_cache = None, None
+    if self.cell_type == 'rnn':
+      h, rnn_cache = rnn_forward(x, h0, Wx, Wh, b)
+    elif self.cell_type == 'lstm':
+      pass
+    else:
+      raise NameError('Unexpected cell type.')
+
+    scores, ta_cache = temporal_affine_forward(h, W_vocab, b_vocab)
+    loss, dscores = temporal_softmax_loss(scores, captions_out, mask, verbose=False)
+
+    # Backward Pass
+    dh, grads['W_vocab'], grads['b_vocab'] = temporal_affine_backward(dscores, ta_cache)
+
+    dx, dh0, dWx, dWh, db = None, None, None, None, None
+    if self.cell_type == 'rnn':
+      dx, dh0, grads['Wx'], grads['Wh'], grads['b'] = rnn_backward(dh,rnn_cache)
+    elif self.cell_type == 'lstm':
+      pass
+    else:
+      raise NameError('Unexpected cell type.')
+
+    grads['W_embed'] = word_embedding_backward(dx,embed_cache)
+    grads['b_proj'] = np.sum(dh0,axis=0)
+    grads['W_proj'] = np.dot(features.T,dh0)
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
@@ -197,7 +226,17 @@ class CaptioningRNN(object):
     # functions; you'll need to call rnn_step_forward or lstm_step_forward in #
     # a loop.                                                                 #
     ###########################################################################
-    pass
+    next_h = np.dot(features,W_proj) + b
+    current_caption = (np.zeros((N, 1)) + self._start).astype(int)
+    captions = current_caption
+
+    for i in xrange(max_length):
+        embedded_captions, _ = word_embedding_forward(current_caption, W_embed)
+        next_h, _ = rnn_step_forward(np.squeeze(embedded_captions), next_h, Wx, Wh, b)
+        output, _  = temporal_affine_forward(next_h[:,np.newaxis,:], W_vocab, b_vocab)
+        current_caption = np.argmax(np.squeeze(output),axis=1).reshape(-1,1)
+        captions = np.hstack((captions,current_caption))
+    captions = captions[:,1:]
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
