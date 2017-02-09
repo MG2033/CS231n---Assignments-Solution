@@ -144,7 +144,7 @@ class CaptioningRNN(object):
     if self.cell_type == 'rnn':
       h, rnn_cache = rnn_forward(x, h0, Wx, Wh, b)
     elif self.cell_type == 'lstm':
-      pass
+      h, rnn_cache = lstm_forward(x, h0, Wx, Wh, b)
     else:
       raise NameError('Unexpected cell type.')
 
@@ -158,7 +158,7 @@ class CaptioningRNN(object):
     if self.cell_type == 'rnn':
       dx, dh0, grads['Wx'], grads['Wh'], grads['b'] = rnn_backward(dh,rnn_cache)
     elif self.cell_type == 'lstm':
-      pass
+      dx, dh0, grads['Wx'], grads['Wh'], grads['b'] = lstm_backward(dh, rnn_cache)
     else:
       raise NameError('Unexpected cell type.')
 
@@ -226,13 +226,21 @@ class CaptioningRNN(object):
     # functions; you'll need to call rnn_step_forward or lstm_step_forward in #
     # a loop.                                                                 #
     ###########################################################################
-    next_h = np.dot(features,W_proj) + b
+    next_h = np.dot(features,W_proj) + b_proj
+    next_c = np.zeros_like(next_h)
     current_caption = (np.zeros((N, 1)) + self._start).astype(int)
     captions = current_caption
 
     for i in xrange(max_length):
         embedded_captions, _ = word_embedding_forward(current_caption, W_embed)
-        next_h, _ = rnn_step_forward(np.squeeze(embedded_captions), next_h, Wx, Wh, b)
+
+        if self.cell_type == 'rnn':
+          next_h, _ = rnn_step_forward(np.squeeze(embedded_captions), next_h, Wx, Wh, b)
+        elif self.cell_type == 'lstm':
+          next_h, next_c, _ = lstm_step_forward(np.squeeze(embedded_captions), next_h, next_c, Wx, Wh, b)
+        else:
+          raise NameError('Unexpected cell type.')
+
         output, _  = temporal_affine_forward(next_h[:,np.newaxis,:], W_vocab, b_vocab)
         current_caption = np.argmax(np.squeeze(output),axis=1).reshape(-1,1)
         captions = np.hstack((captions,current_caption))

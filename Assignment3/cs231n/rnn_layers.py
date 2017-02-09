@@ -254,7 +254,15 @@ def lstm_step_forward(x, prev_h, prev_c, Wx, Wh, b):
   # TODO: Implement the forward pass for a single timestep of an LSTM.        #
   # You may want to use the numerically stable sigmoid implementation above.  #
   #############################################################################
-  pass
+  bi, bf, bo, bg = np.split(x.dot(Wx) + prev_h.dot(Wh) + b, 4, axis=1)
+  i = sigmoid(bi)
+  f = sigmoid(bf)
+  o = sigmoid(bo)
+  g = np.tanh(bg)
+  next_c = f * prev_c + i * g
+  tanhnext_c = np.tanh(next_c)
+  next_h = o * tanhnext_c
+  cache = (x,bi,bf,bo,bg,i,f,o,g,prev_c,tanhnext_c,Wx,Wh,prev_h)
   ##############################################################################
   #                               END OF YOUR CODE                             #
   ##############################################################################
@@ -279,14 +287,33 @@ def lstm_step_backward(dnext_h, dnext_c, cache):
   - dWh: Gradient of hidden-to-hidden weights, of shape (H, 4H)
   - db: Gradient of biases, of shape (4H,)
   """
-  dx, dh, dc, dWx, dWh, db = None, None, None, None, None, None
+  dx, dprev_h, dprev_c, dWx, dWh, db = None, None, None, None, None, None
   #############################################################################
   # TODO: Implement the backward pass for a single timestep of an LSTM.       #
   #                                                                           #
   # HINT: For sigmoid and tanh you can compute local derivatives in terms of  #
   # the output value from the nonlinearity.                                   #
   #############################################################################
-  pass
+  x,bi, bf, bo, bg, i, f, o, g, prev_c, tanhnext_c, Wx, Wh,prev_h = cache
+  dnext_c += o * (1-tanhnext_c**2) * dnext_h
+  do = tanhnext_c * dnext_h
+  df = prev_c * dnext_c
+  dprev_c = f * dnext_c
+  di = g * dnext_c
+  dg = i * dnext_c
+
+  dbi = sigmoid(bi) * (1-sigmoid(bi)) * di
+  dbf = sigmoid(bf) * (1-sigmoid(bf)) * df
+  dbo = sigmoid(bo) * (1-sigmoid(bo)) * do
+  dbg = (1-np.tanh(bg)**2) * dg
+  difog = np.hstack((dbi,dbf,dbo,dbg))
+
+  dx = np.dot(difog,Wx.T)
+  dWx = np.dot(x.T,difog)
+  dprev_h = np.dot(difog,Wh.T)
+  dWh = np.dot(prev_h.T, difog)
+  db = np.sum(difog,axis=0)
+
   ##############################################################################
   #                               END OF YOUR CODE                             #
   ##############################################################################
@@ -321,7 +348,16 @@ def lstm_forward(x, h0, Wx, Wh, b):
   # TODO: Implement the forward pass for an LSTM over an entire timeseries.   #
   # You should use the lstm_step_forward function that you just defined.      #
   #############################################################################
-  pass
+  N,T,D = x.shape
+  H = h0.shape[1]
+  current_h = h0
+  current_c = np.zeros_like(h0)
+  h = np.zeros((N,T,H))
+  cache = []
+  for i in xrange(T):
+      current_h, current_c, caches = lstm_step_forward(x[:,i,:], current_h, current_c, Wx, Wh, b)
+      h[:,i,:] = current_h
+      cache.append(caches)
   ##############################################################################
   #                               END OF YOUR CODE                             #
   ##############################################################################
@@ -349,7 +385,22 @@ def lstm_backward(dh, cache):
   # TODO: Implement the backward pass for an LSTM over an entire timeseries.  #
   # You should use the lstm_step_backward function that you just defined.     #
   #############################################################################
-  pass
+  N,T,H = dh.shape
+  D = cache[0][0].shape[1]
+  dcurrent_h = np.zeros((N,H))
+  dcurrent_c = np.zeros_like(dcurrent_h)
+  dWx = np.zeros((D,4*H))
+  dWh = np.zeros((H,4*H))
+  db = np.zeros((4*H))
+  dx = np.zeros((N,T,D))
+
+  for i in xrange(T - 1, -1, -1):
+      dcurrent_h += dh[:,i,:]
+      dx[:,i,:], dcurrent_h, dcurrent_c, dWx_current, dWh_current, db_current = lstm_step_backward(dcurrent_h, dcurrent_c, cache[i])
+      dWx += dWx_current
+      dWh += dWh_current
+      db += db_current
+  dh0 = dcurrent_h
   ##############################################################################
   #                               END OF YOUR CODE                             #
   ##############################################################################
